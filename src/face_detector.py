@@ -1,8 +1,3 @@
-# Responsible for:
-# - loading Mediapipe
-# - detecting face bounding box
-# - returning (x, y, w, h)
-
 import mediapipe as mp
 import cv2
 
@@ -13,7 +8,8 @@ class FaceDetector:
             model_selection=0,                      #optimised for webcam/close range faces
             min_detection_confidence=min_conf
         )
-    def get_face_box(self, frame):                  #returns (x,y,w,h) for detected face and "None" if no face found
+
+    def detect(self, frame):                  #returns (x,y,w,h) for detected face and "None" if no face found
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) #mediapipe expects RGB while opencv gives BGR, hence convert
         result=self.detector.process(rgb)
 
