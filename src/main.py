@@ -1,82 +1,88 @@
-# Responsible for:
-# - the real-time loop
-# - calling all modules
-# - displaying output
-
-
 import cv2
-from face_detector import FaceDetector
-from face_expression import FaceExpression
 import time
 
+from face_detector import FaceDetector
+from face_expression import FaceExpression
+from hand_detector import HandDetector
+from gesture_detector import GestureDetector
+
+
 def main():
-    detector= FaceDetector()
-    expr=FaceExpression()
+    cap = cv2.VideoCapture(0)
 
-    cap=cv2.VideoCapture(0)
+    face_detector = FaceDetector()
+    face_expression = FaceExpression()
+    hand_detector = HandDetector()
+    gesture_detector = GestureDetector()
 
-    if not cap.isOpened():
-        print("Error: Could not open webcam.")
-        return
-    
     prev_time = 0
-    
+
     while True:
-        ret, frame=cap.read()
+        ret, frame = cap.read()
+        frame = cv2.flip(frame, 1)
         if not ret:
-            print("Failed to grab frame.")
             break
 
-        box=detector.get_face_box(frame)
+        #face detection
+        face_bbox = face_detector.detect(frame)
 
-        if box is not None:
-            x,y,w,h=box
+        expression = None
+        face_kp = None
 
-            cv2.rectangle(
-                frame,
-                (x,y),
-                (x+w, y+h),
-                (0, 255, 0),
-                2
-            )
+        if face_bbox is not None:
+            # Draw face bbox for debugging
+            x, y, w, h = face_bbox
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 225, 0), 2)
 
-        expression=expr.get_expression(frame)
+            #face expression
+            expression, face_kp = face_expression.detect(frame)
 
-        print("Expression:", expression)
+            # Draw essential face keypoints
+            if face_kp is not None:
+                for key, (px, py) in face_kp.items():
+                    cv2.circle(frame, (px, py), 4, (0, 255, 255), -1)
 
-        cv2.putText(
-            frame,
-            expression,
-            (30, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1.2,
-            (255, 255, 255),
-            3
-        )
+        #hand detection
+        hands = hand_detector.detect(frame)
 
-        # FPS Calculation
-        current_time = time.time()
-        fps = 1 / (current_time - prev_time) if prev_time != 0 else 0
-        prev_time = current_time
+        # Draw hand landmarks (optional debugging)
+        if hands["left"]:
+            for (x, y) in hands["left"]:
+                cv2.circle(frame, (x, y), 4, (0, 255, 0), -1)
 
-        cv2.putText(
-            frame,
-            f"FPS: {int(fps)}",
-            (30, 90),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2
-        )
+        if hands["right"]:
+            for (x, y) in hands["right"]:
+                cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)
 
-        cv2.imshow("Webcam - Expression Test", frame)
+        #gesture detection
+        gesture = None
+        if face_kp is not None and face_bbox is not None:
+            gesture = gesture_detector.get_gesture(face_kp, face_bbox, hands)
 
-        if cv2.waitKey(1) & 0xFF == 27:
+        #calculate fps
+        curr_time = time.time()
+        fps = 1 / (curr_time - prev_time) if prev_time != 0 else 0
+        prev_time = curr_time
+
+        cv2.putText(frame, f"FPS: {int(fps)}", (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+        if expression:
+            cv2.putText(frame, f"Expression: {expression}", (20, 80),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+
+        if gesture:
+            cv2.putText(frame, f"Gesture: {gesture}", (20, 120),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 200, 255), 2)
+
+        cv2.imshow("Emotion + Gesture Detection (B2)", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
 
+
 if __name__ == "__main__":
     main()
-
