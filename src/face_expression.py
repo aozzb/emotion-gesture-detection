@@ -1,17 +1,3 @@
-# Responsible for:
-# - Initializing MediaPipe Face Mesh
-# - Detecting facial landmarks for one face
-# - Computing geometric metrics such as:
-#       * mouth open ratio
-#       * smile curvature
-#       * eye aspect ratio (eye openness)
-# - Classifying simple expressions based on threshold rules:
-#       * "smile"
-#       * "mouth_open"
-#       * "eyes_closed"
-#       * "neutral"
-# - Returning a label describing the detected face expression
-
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -151,6 +137,36 @@ class FaceExpression:
             return "smile"
         else:
             return "neutral"
+        
+    def get_expression_and_keypoints(self, frame):
+
+        landmarks = self._get_landmarks(frame)
+        if landmarks is None:
+            return ("neutral", None)
+
+        # Extract ~8 relevant facial points
+        pts = self._get_points(frame, landmarks)
+
+        # Compute metrics (same as get_expression)
+        mouth_open_ratio = self._smooth(self.mouth_open_history, self._mouth_open_ratio(pts))
+        smile_ratio = self._smooth(self.smile_history, self._smile_ratio(pts))
+        ear = self._smooth(self.ear_history, self._ear(pts))
+
+        if ear < 5:
+            expression = "eyes_closed"
+        elif mouth_open_ratio > 0.55:
+            expression = "mouth_open"
+        elif smile_ratio > 2.8 and self._smile_curvature(pts) > 5:
+            expression = "smile"
+        else:
+            expression = "neutral"
+
+        return (expression, pts)
+    
+    def detect(self, frame):
+        #Unified API for main.py.
+        #Returns: (expression_label, key_face_points)
+        return self.get_expression_and_keypoints(frame)
         
     def _get_all_landmarks_pixel(self, frame, landmarks):
         """Return all 468 face mesh landmarks in pixel coordinates."""
