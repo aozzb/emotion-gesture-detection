@@ -5,6 +5,7 @@ from face_detector import FaceDetector
 from face_expression import FaceExpression
 from hand_detector import HandDetector
 from gesture_detector import GestureDetector
+from mapper import EmoteMapper
 
 
 def main():
@@ -14,14 +15,15 @@ def main():
     face_expression = FaceExpression()
     hand_detector = HandDetector()
     gesture_detector = GestureDetector()
+    emote_mapper=EmoteMapper()
 
     prev_time = 0
 
     while True:
         ret, frame = cap.read()
-        frame = cv2.flip(frame, 1)
         if not ret:
             break
+        frame = cv2.flip(frame, 1)
 
         #face detection
         face_bbox = face_detector.detect(frame)
@@ -58,6 +60,11 @@ def main():
         gesture = None
         if face_kp is not None and face_bbox is not None:
             gesture = gesture_detector.get_gesture(face_kp, face_bbox, hands)
+
+        #
+        emote_key = emote_mapper.resolve_emote(expression, gesture)
+        emote_mapper.render(emote_key)
+
 
         #calculate fps
         curr_time = time.time()
